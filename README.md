@@ -105,6 +105,9 @@ when guessing could capture the wrong shot.
 | Decimal that must not become a Double | Step skipped, no silent default. A default is for a *missing* threshold; a present-but-invalid one is an authoring error and masking it would run the step on criteria nobody set |
 | Unknown keys | Ignored so the format can grow, but reported as an info diagnostic so a newer plan version is not silently half-read |
 
+`plan_malformed.json` carries all nine malformations plus a partial threshold.
+Steps 1–3 survive, steps 4–7 are skipped; the table above says why for each.
+
 ### Applied defaults
 
 | Situation | Default |
