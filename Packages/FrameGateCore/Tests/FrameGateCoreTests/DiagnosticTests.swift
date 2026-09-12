@@ -13,7 +13,7 @@ final class DiagnosticTests: XCTestCase {
     let diagnostic = Diagnostic(severity: .warning, message: "threshold is missing")
     XCTAssertEqual(diagnostic.text, "[warning] threshold is missing")
   }
-  
+
   func testTextIncludesStepIDWhenPresent() {
     let diagnostic = Diagnostic(severity: .info, stepID: "front-label", message: "holdframes coerced from string")
     XCTAssertEqual(diagnostic.text, "[info] step 'front-label': holdframes coerced from string")

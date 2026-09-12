@@ -18,21 +18,42 @@ extension PlanParser {
         static let holdFrames = 5
     }
 
+    /// The parts of a step that must be present and readable for it to survive.
+    private struct ValidatedCore {
+        let id: String
+        let kind: StepKind
+        let roi: NormalizedRegion
+        let thresholds: Thresholds
+    }
+
+    private enum GateResult {
+        case passed(ValidatedCore)
+        case discarded(Diagnostic)
+    }
+
     static func validate(_ raw: RawStep, alreadySeen: Set<String>) -> StepOutcome {
         var container = raw.container
-        var notes: [Diagnostic] = []
 
-        // Gates: any failure here discards the step.
+        switch gate(&container, alreadySeen: alreadySeen) {
+        case .discarded(let diagnostic):
+            return .skipped(diagnostic)
+        case .passed(let core):
+            return assemble(core, from: &container)
+        }
+    }
 
+    /// Anything that fails here discards the step.
+    private static func gate(_ container: inout LenientContainer,
+                             alreadySeen: Set<String>) -> GateResult {
         guard let id = container.decodeIfPresent(String.self, "id") else {
-            return .skipped(Diagnostic(
+            return .discarded(Diagnostic(
                 severity: .warning,
                 message: "step is missing its id"
             ))
         }
 
         guard !alreadySeen.contains(id) else {
-            return .skipped(Diagnostic(
+            return .discarded(Diagnostic(
                 severity: .warning,
                 stepID: id,
                 message: "duplicate id, this occurrence was dropped"
@@ -41,7 +62,7 @@ extension PlanParser {
 
         guard let kindName = container.decodeIfPresent(String.self, "kind"),
               let kind = StepKind(rawValue: kindName) else {
-            return .skipped(Diagnostic(
+            return .discarded(Diagnostic(
                 severity: .warning,
                 stepID: id,
                 message: "unknown step kind, skipped rather than degraded"
@@ -49,7 +70,7 @@ extension PlanParser {
         }
 
         guard let roi = region(from: &container) else {
-            return .skipped(Diagnostic(
+            return .discarded(Diagnostic(
                 severity: .warning,
                 stepID: id,
                 message: "missing or invalid roi, nothing to measure"
@@ -57,46 +78,60 @@ extension PlanParser {
         }
 
         guard let thresholds = thresholds(from: &container) else {
-            return .skipped(Diagnostic(
+            return .discarded(Diagnostic(
                 severity: .warning,
                 stepID: id,
                 message: "a threshold could not be read as a decimal"
             ))
         }
 
-        // The step survives; from here on only diagnostics.
+        return .passed(ValidatedCore(id: id, kind: kind, roi: roi, thresholds: thresholds))
+    }
 
-        let label = container.decodeIfPresent(String.self, "label") ?? id
-
-        var holdFrames = Defaults.holdFrames
-        if let (value, coerced) = Coercion.integer(&container, "holdFrames") {
-            holdFrames = value
-            if coerced {
-                notes.append(Diagnostic(
-                    severity: .info,
-                    stepID: id,
-                    message: "holdFrames arrived as a string and was coerced"
-                ))
-            }
-        } else {
-            notes.append(Diagnostic(
-                severity: .info,
-                stepID: id,
-                message: "holdFrames unreadable, default of \(Defaults.holdFrames) applied"
-            ))
-        }
+    /// The step already survived; everything here only produces diagnostics.
+    private static func assemble(_ core: ValidatedCore,
+                                 from container: inout LenientContainer) -> StepOutcome {
+        var notes: [Diagnostic] = []
+        let label = container.decodeIfPresent(String.self, "label") ?? core.id
+        let holdFrames = holdFrames(from: &container, stepID: core.id, notes: &notes)
 
         for key in container.unusedKeys {
             notes.append(Diagnostic(
                 severity: .info,
-                stepID: id,
+                stepID: core.id,
                 message: "unknown key '\(key)' ignored"
             ))
         }
 
-        let step = Step(id: id, kind: kind, label: label,
-                        roi: roi, thresholds: thresholds, holdFrames: holdFrames)
+        let step = Step(id: core.id,
+                        kind: core.kind,
+                        label: label,
+                        roi: core.roi,
+                        thresholds: core.thresholds,
+                        holdFrames: holdFrames)
         return .success(step, notes: notes)
+    }
+
+    private static func holdFrames(from container: inout LenientContainer,
+                                   stepID: String,
+                                   notes: inout [Diagnostic]) -> Int {
+        guard let (value, coerced) = Coercion.integer(&container, "holdFrames") else {
+            notes.append(Diagnostic(
+                severity: .info,
+                stepID: stepID,
+                message: "holdFrames unreadable, default of \(Defaults.holdFrames) applied"
+            ))
+            return Defaults.holdFrames
+        }
+
+        if coerced {
+            notes.append(Diagnostic(
+                severity: .info,
+                stepID: stepID,
+                message: "holdFrames arrived as a string and was coerced"
+            ))
+        }
+        return value
     }
 
     static func region(from container: inout LenientContainer) -> NormalizedRegion? {
