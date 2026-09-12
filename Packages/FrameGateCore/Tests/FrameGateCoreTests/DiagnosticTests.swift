@@ -13,4 +13,9 @@ final class DiagnosticTests: XCTestCase {
         let diagnostic = Diagnostic(severity: .warning, message: "umbral ausente")
         XCTAssertEqual(diagnostic.text, "[warning] umbral ausente")
     }
+
+    func testTextIncludesStepIDWhenPresent() {
+        let diagnostic = Diagnostic(severity: .info, stepID: "front-label", message: "holdframes coerced from string")
+        XCTAssertEqual(diagnostic.text, "[info] step 'front-label': holdframes coerced from string")
+    }
 }
