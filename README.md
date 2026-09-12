@@ -14,6 +14,9 @@ continues.
 
 ### The tests
 
+Select the `FrameGateCoreTests` scheme and run ⌘U. All logic lives in the
+`FrameGateCore` package, so the tests run without launching the app.
+
 ### The mock server
 
 ## Plan format
