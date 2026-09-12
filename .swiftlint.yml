@@ -21,3 +21,7 @@ identifier_name:
     - id
     - x
     - y
+
+function_parameter_count:
+  warning: 8
+  error: 10
