@@ -121,6 +121,37 @@ Steps 1–3 survive, steps 4–7 are skipped; the table above says why for each.
 
 ## ROI mapping
 
+The plan's region is normalized against the **sensor buffer**, not the view. A
+plan describes which part of the subject to photograph — "the label sits in the
+upper third of the box" — so rotating the device must keep measuring the same
+part of the subject even though the outline moves on screen. Normalizing against
+the view would do the opposite: the outline would stay put and the measured
+region would change with every rotation.
+
+One pure function maps that region into both spaces:
+
+```swift
+func map(
+    _ region: NormalizedRegion,
+    bufferSize: CGSize,
+    sensorRotation: Rotation,
+    mirrored: Bool,
+    displayOrientation: DisplayOrientation,
+    viewSize: CGSize,
+    fillMode: FillMode
+) -> MappedRegion
+```
+
+`MappedRegion` carries the rectangle in buffer coordinates, used for measuring,
+and in view coordinates, used for drawing. The on-screen outline is drawn only
+from the latter — there is no hand-tuned offset anywhere, because the two
+rectangles must describe the same region for any of the measurements to mean
+anything.
+
+`DisplayOrientation` is defined in Core rather than reusing
+`UIInterfaceOrientation`, so the package never imports UIKit. The app maps from
+UIKit to it at the boundary.
+
 ## Metrics
 
 ### Sharpness
