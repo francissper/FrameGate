@@ -6,6 +6,10 @@ Built with Xcode 26.6 on macOS 26.4 (Apple M5), swift-tools-version 6.0,
 deployment target iOS 17.0. Xcode 16 cannot be installed on macOS 26, so
 compatibility with that version is unverified.
 
+SwiftLint runs as a build phase with `force_unwrapping` set to error. If SwiftLint
+is not installed (`brew install swiftlint`), the phase logs a warning and the build
+continues.
+
 ### The app
 
 ### The tests
