@@ -1,0 +1,45 @@
+{
+  "planId": "warehouse-intake-v1",
+  "createdAt": "2026-09-12T04:30:00Z",
+  "steps": [
+    {
+      "id": "front-label",
+      "kind": "single",
+      "label": "Front label",
+      "roi": { "x": 0.15, "y": 0.30, "width": 0.70, "height": 0.25 },
+      "thresholds": {
+        "sharpness": { "enter": "0.60", "exit": "0.45" },
+        "meanLuma": { "enter": "0.35", "exit": "0.25" },
+        "clippedFraction": { "enter": "0.05", "exit": "0.10" },
+        "motion": { "enter": "0.02", "exit": "0.04" }
+      },
+      "holdFrames": 8
+    },
+    {
+      "id": "serial-number",
+      "kind": "single",
+      "label": "Serial number",
+      "roi": { "x": 0.35, "y": 0.55, "width": 0.30, "height": 0.12 },
+      "thresholds": {
+        "sharpness": { "enter": "0.80", "exit": "0.65" },
+        "meanLuma": { "enter": "0.40", "exit": "0.30" },
+        "clippedFraction": { "enter": "0.03", "exit": "0.08" },
+        "motion": { "enter": "0.01", "exit": "0.03" }
+      },
+      "holdFrames": 12
+    },
+    {
+      "id": "overview",
+      "kind": "single",
+      "label": "Full unit",
+      "roi": { "x": 0.05, "y": 0.05, "width": 0.90, "height": 0.90 },
+      "thresholds": {
+        "sharpness": { "enter": "0.40", "exit": "0.30" },
+        "meanLuma": { "enter": "0.30", "exit": "0.20" },
+        "clippedFraction": { "enter": "0.10", "exit": "0.15" },
+        "motion": { "enter": "0.04", "exit": "0.07" }
+      },
+      "holdFrames": 5
+    }
+  ]
+}

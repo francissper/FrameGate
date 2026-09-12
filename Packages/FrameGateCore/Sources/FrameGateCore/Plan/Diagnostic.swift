@@ -6,20 +6,23 @@
 //
 
 public struct Diagnostic: Equatable, Sendable {
-    public enum Severity: String, Sendable {
-        case info
-        case warning
-    }
+  public enum Severity: String, Sendable {
+    case info
+    case warning
+  }
 
-    public let severity: Severity
-    public let message: String
+  public let severity: Severity
+  public let stepID: String?
+  public let message: String
 
-    public init(severity: Severity, message: String) {
-        self.severity = severity
-        self.message = message
-    }
+  public init(severity: Severity, stepID: String? = nil, message: String) {
+    self.severity = severity
+    self.stepID = stepID
+    self.message = message
+  }
 
-    public var text: String {
-        "[\(severity.rawValue)] \(message)"
-    }
+  public var text: String {
+    guard let stepID else { return "[\(severity.rawValue)] \(message)" }
+    return "[\(severity.rawValue)] step '\(stepID)': \(message)"
+  }
 }
