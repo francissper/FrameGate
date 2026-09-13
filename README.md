@@ -209,6 +209,11 @@ directions are measured so an image with purely vertical or purely horizontal
 edges is not misread as flat. Sobel's advantage is noise robustness, which
 synthetic patterns do not need.
 
+Sharpness is the one metric that does not subsample: it measures adjacent
+pixels, so skipping every other one would compare neighbours that are not
+neighbours. Exposure and motion do subsample, since a mean and a downsample lose
+nothing by it.
+
 ### Exposure
 
 Mean luma over 0…1, plus two clipping fractions rather than one: pixels at or
@@ -242,6 +247,12 @@ Normalizing against the ROI's own local contrast instead would let a
 low-contrast scene read fairly, but costs a second pass over the pixels and
 makes plan thresholds depend on what is in front of the camera. With synthetic
 patterns of known contrast, the fixed baseline is the better trade.
+
+K = 26.67, measured on the reference checkerboard at 320×240. A checker of 16
+and 235 in 8-pixel squares crosses an edge on roughly one pair of neighbours in
+eight, putting the theoretical value near 219/8 = 27.4; the measured figure sits
+slightly below because the region's last row and column have no neighbour to
+compare against.
 
 ## Gate
 
