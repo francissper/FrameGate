@@ -9,6 +9,12 @@ import XCTest
 import CoreVideo
 @testable import FrameGateCore
 
+private struct LumaStats {
+    let mean: Double
+    let clipped: Double
+    let maxStep: Int
+}
+
 final class PatternGeneratorTests: XCTestCase {
 
     private let size = CGSize(width: 320, height: 240)
@@ -16,12 +22,12 @@ final class PatternGeneratorTests: XCTestCase {
     /// Reads the Y plane the same way the analyzer will: honouring bytesPerRow,
     /// with the lock held for exactly as long as the read.
     private func lumaStats(_ buffer: CVPixelBuffer,
-                           columns: Range<Int>? = nil) -> (mean: Double, clipped: Double, maxStep: Int) {
+                           columns: Range<Int>? = nil) -> LumaStats {
         CVPixelBufferLockBaseAddress(buffer, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
 
         guard let base = CVPixelBufferGetBaseAddressOfPlane(buffer, 0) else {
-            return (0, 0, 0)
+            return LumaStats(mean: 0, clipped: 0, maxStep: 0)
         }
         let width = CVPixelBufferGetWidthOfPlane(buffer, 0)
         let height = CVPixelBufferGetHeightOfPlane(buffer, 0)
@@ -47,9 +53,9 @@ final class PatternGeneratorTests: XCTestCase {
             }
         }
 
-        return (Double(total) / Double(count),
-                Double(clipped) / Double(count),
-                maxStep)
+        return LumaStats(mean: Double(total) / Double(count),
+                         clipped: Double(clipped) / Double(count),
+                         maxStep: maxStep)
     }
 
     private func makeBuffer(_ pattern: PatternGenerator.Pattern) throws -> CVPixelBuffer {
