@@ -7,6 +7,10 @@
 
 import Foundation
 
+public enum JournalError: Error {
+    case encodingFailed
+}
+
 /// An append-only log of state transitions, one JSON object per line.
 ///
 /// Append-only rather than a mutable store because a single `write` followed by
@@ -44,7 +48,10 @@ public final class Journal {
     public func replay() throws -> [CaptureRecord] {
         let data = try Data(contentsOf: url)
         guard !data.isEmpty else { return [] }
-        let text = String(decoding: data, as: UTF8.self)
+        guard let text = String(bytes: data, encoding: .utf8) else {
+            // The whole file is not valid UTF-8: nothing here can be trusted.
+            return []
+        }
 
         var records: [UUID: CaptureRecord] = [:]
         var order: [UUID] = []
@@ -95,7 +102,10 @@ private extension Journal {
                     "at": at.timeIntervalSince1970]
         }
         let data = try JSONSerialization.data(withJSONObject: dict, options: [.sortedKeys])
-        return String(decoding: data, as: UTF8.self)
+        guard let json = String(bytes: data, encoding: .utf8) else {
+            throw JournalError.encodingFailed
+        }
+        return json
     }
 
     func deserialize(_ json: [String: Any]) -> JournalEvent? {
