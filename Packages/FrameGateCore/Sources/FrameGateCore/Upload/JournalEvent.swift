@@ -16,6 +16,7 @@ public enum JournalEvent: Equatable, Sendable {
     case retryScheduled(captureID: UUID, nextAttemptAt: Date, at: Date)
     case uploaded(captureID: UUID, at: Date)
     case failed(captureID: UUID, at: Date)
+    case manuallyRetried(captureID: UUID, at: Date)
 
     public var captureID: UUID {
         switch self {
@@ -23,7 +24,8 @@ public enum JournalEvent: Equatable, Sendable {
              .attempted(let id, _, _),
              .retryScheduled(let id, _, _),
              .uploaded(let id, _),
-             .failed(let id, _):
+             .failed(let id, _),
+             .manuallyRetried(let id, _):
             return id
         }
     }

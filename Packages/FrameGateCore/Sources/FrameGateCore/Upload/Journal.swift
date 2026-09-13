@@ -100,6 +100,10 @@ private extension Journal {
             dict = ["event": "failed",
                     "captureId": id.uuidString,
                     "at": at.timeIntervalSince1970]
+        case .manuallyRetried(let id, let at):
+            dict = ["event": "manuallyRetried",
+                    "captureId": id.uuidString,
+                    "at": at.timeIntervalSince1970]
         }
         let data = try JSONSerialization.data(withJSONObject: dict, options: [.sortedKeys])
         guard let json = String(bytes: data, encoding: .utf8) else {
@@ -136,6 +140,8 @@ private extension Journal {
             return .uploaded(captureID: id, at: at)
         case "failed":
             return .failed(captureID: id, at: at)
+        case "manuallyRetried":
+            return .manuallyRetried(captureID: id, at: at)
         default:
             return nil
         }
@@ -164,6 +170,10 @@ private extension Journal {
             records[id]?.nextAttemptAt = nil
         case .failed(let id, _):
             records[id]?.status = .failed
+            records[id]?.nextAttemptAt = nil
+        case .manuallyRetried(let id, _):
+            records[id]?.status = .pending
+            records[id]?.attempts = 0
             records[id]?.nextAttemptAt = nil
         }
     }
