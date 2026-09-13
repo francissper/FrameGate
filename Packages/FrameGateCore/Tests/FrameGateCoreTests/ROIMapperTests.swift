@@ -61,7 +61,7 @@ extension ROIMapperTests {
     let roi = try region(0.15, 0.30, 0.70, 0.25)
     let bounds = CGRect(origin: .zero, size: buffer)
 
-    try everyCombination { rotation, mirrored, orientation, fill in
+    everyCombination { rotation, mirrored, orientation, fill in
       let mapped = map(roi, rotation, mirrored, orientation, fill)
       XCTAssertTrue(
         bounds.contains(mapped.buffer),
@@ -74,7 +74,7 @@ extension ROIMapperTests {
     let centred = try region(0.25, 0.25, 0.50, 0.50)
     let bufferCentre = CGPoint(x: buffer.width / 2, y: buffer.height / 2)
 
-    try everyCombination { rotation, mirrored, orientation, fill in
+    everyCombination { rotation, mirrored, orientation, fill in
       let mapped = map(centred, rotation, mirrored, orientation, fill)
       XCTAssertEqual(mapped.buffer.midX, bufferCentre.x, accuracy: 0.5)
       XCTAssertEqual(mapped.buffer.midY, bufferCentre.y, accuracy: 0.5)
@@ -86,7 +86,7 @@ extension ROIMapperTests {
     let bufferArea = buffer.width * buffer.height
     let expected = 0.70 * 0.25
 
-    try everyCombination { rotation, mirrored, orientation, fill in
+    everyCombination { rotation, mirrored, orientation, fill in
       let mapped = map(roi, rotation, mirrored, orientation, fill)
       let covered = (mapped.buffer.width * mapped.buffer.height) / bufferArea
       XCTAssertEqual(covered, expected, accuracy: 0.001,
@@ -98,7 +98,7 @@ extension ROIMapperTests {
     let roi = try region(0.05, 0.05, 0.90, 0.90)
     let bounds = CGRect(origin: .zero, size: view)
 
-    try everyCombination { rotation, mirrored, orientation, _ in
+    everyCombination { rotation, mirrored, orientation, _ in
       let mapped = map(roi, rotation, mirrored, orientation, .aspectFit)
       XCTAssertTrue(
         bounds.contains(mapped.view),
@@ -160,7 +160,7 @@ extension ROIMapperTests {
     let leftThird = try region(0.0, 0.25, 0.33, 0.50)
     let rightThird = try region(0.67, 0.25, 0.33, 0.50)
 
-    try everyCombination { rotation, mirrored, orientation, fill in
+    everyCombination { rotation, mirrored, orientation, fill in
       let left = map(leftThird, rotation, mirrored, orientation, fill)
       let right = map(rightThird, rotation, mirrored, orientation, fill)
 
@@ -179,7 +179,7 @@ extension ROIMapperTests {
       // The whole frame must map to the whole content area, for every combination.
       let whole = try region(0.0, 0.0, 1.0, 1.0)
 
-      try everyCombination { rotation, mirrored, orientation, fill in
+      everyCombination { rotation, mirrored, orientation, fill in
           let mapped = map(whole, rotation, mirrored, orientation, fill)
 
           // Measuring the whole frame means the buffer rect is the buffer itself.

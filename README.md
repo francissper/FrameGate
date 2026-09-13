@@ -299,9 +299,64 @@ discards the previous downsample for the same reason.
 
 ### Manifest
 
+Field names, units and encodings are documented in `ManifestEncoder` and pinned
+by `ManifestEncoderTests`: a field added or renamed fails the test before it
+reaches the wire. Timestamps are ISO 8601 in UTC with milliseconds. Sensor
+rotation is an angle so it travels as a number; display orientation is a label
+so it travels as a string. The region uses the same 0…1 top-left convention as
+the plan. Every measured value carries exactly four decimal places as a string,
+so a receiving parser cannot turn 0.8412 into 0.8411999999999999.
+
+The journal encodes its timestamps as epoch seconds rather than ISO 8601. It is
+internal and only this code reads it; the manifest is a contract with a server
+and gets the readable, unambiguous form.
+
 ### Durability semantics
 
+The order on fire is: JPEG to disk, manifest to disk, `captured` to the journal,
+and only then the network. Once `enqueue` returns, the capture survives a
+force-quit.
+
+There are only three persisted states — `pending`, `uploaded`, `failed`. There is
+deliberately no `uploading`: the moment a process dies mid-request, that state
+would be a lie, and recovering from it would mean scanning for orphans on every
+launch. Instead the attempt is journalled before the request goes out and the
+record stays `pending` until an outcome arrives. After a crash it is already in
+the right state with no recovery pass at all.
+
+What makes that safe is the idempotency key: generated once when the shutter
+fires, never regenerated. A timeout leaves the outcome genuinely unknown — the
+shot may have been stored — and only an unchanged key lets the server recognise
+the retry and answer `200 duplicate` instead of storing it twice.
+
+The journal is append-only. A single write plus `synchronize` is either fully on
+disk or absent; rewriting a record in place can be interrupted halfway and leave
+a corrupt one. A torn final line is discarded on replay and everything before it
+stands.
+
 ### Backoff policy
+
+`min(60, 2 × 2^(n-1)) × jitter(0.5…1.5)`, five attempts, then terminal.
+
+Base 2s is long enough for a network hiccup to pass and short enough that the
+user does not notice. Doubling means a server that is genuinely down is not
+hammered. The 60s cap stops the curve running into hours, so a recovering server
+is reached within a minute rather than after a sleep.
+
+Jitter is applied *after* the cap, not before: capped retries would otherwise all
+pin to exactly 60s and lose their spread precisely when the most records are
+waiting.
+
+A `Retry-After` hint always wins over the curve — the server knows when it will
+be ready — but is itself capped, since an hour-long hint would strand a queue
+that only runs in the foreground.
+
+Five attempts cover about 62 seconds. A longer outage exhausts them and the
+record goes to `failed`, retryable by hand from the Queue screen with its
+attempt budget reset. Retrying for longer would only help while the app stays in
+the foreground — background upload is out of scope — so the trade is deliberate:
+recover from a hiccup automatically, surface anything worse rather than draining
+the battery in silence.
 
 ## What I traded away
 
