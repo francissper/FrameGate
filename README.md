@@ -190,13 +190,58 @@ mapping actually depends on.
 
 ## Metrics
 
+Measured inside the mapped region only, reading the Y plane directly with the
+lock held for exactly the duration of the read. No `UIImage`, `CGImage` or Core
+Image anywhere on this path, and no RGB conversion — a camera pipeline works in
+YUV, and converting to measure a gradient would be throwing cycles away.
+
 ### Sharpness
+
+Mean absolute difference between neighbouring pixels, measured both
+horizontally and vertically:
+
+    Σ|I(x+1,y) − I(x,y)| + Σ|I(x,y+1) − I(x,y)|
+
+Chosen over the Laplacian variance or Tenengrad because it is the cheapest
+operator that separates the test patterns, and this runs thirty times a second.
+The Laplacian needs five reads per pixel and Sobel six; this needs three. Both
+directions are measured so an image with purely vertical or purely horizontal
+edges is not misread as flat. Sobel's advantage is noise robustness, which
+synthetic patterns do not need.
 
 ### Exposure
 
+Mean luma over 0…1, plus two clipping fractions rather than one: pixels at or
+below 5 have lost shadow detail, pixels at or above 250 have lost highlight
+detail. Splitting them lets the HUD say which half is blocking instead of the
+unhelpful "exposure". The plan carries a single `clippedFraction` threshold and
+the worse of the two is what it compares against.
+
 ### Motion
 
+Mean absolute difference against the previous frame's downsampled luma. The
+downsample is a fixed 32×32 regardless of ROI size: fixed so the scratch buffer
+never reallocates when the plan advances to a step with a different region, and
+small enough that it acts as a low-pass filter, suppressing sensor noise so only
+real movement registers.
+
+The first frame has no predecessor and reports motion of 1.0 rather than 0.
+Being pessimistic means the gate never arms on a frame it could not compare.
+The same applies after `reset()`, called when the region changes: comparing
+against a downsample of a different region would be meaningless.
+
 ### Sharpness baseline
+
+Sharpness is scale-dependent, so a raw value carries no meaning on its own: it
+changes with the subsampling factor and the size of the region. The raw figure
+is divided by K, measured once on the reference checkerboard, so 1.0 means "as
+sharp as the reference frame". K is a measured value recorded here, not a
+constant picked blind.
+
+Normalizing against the ROI's own local contrast instead would let a
+low-contrast scene read fairly, but costs a second pass over the pixels and
+makes plan thresholds depend on what is in front of the camera. With synthetic
+patterns of known contrast, the fixed baseline is the better trade.
 
 ## Gate
 
