@@ -8,63 +8,58 @@
 import XCTest
 @testable import FrameGateCore
 
-final class GateTests: XCTestCase {
+private struct GateFixture: Decodable {
+    let thresholds: FixtureThresholds
+    let cases: [FixtureCase]
+}
 
-    // MARK: - Fixture shapes
+private struct ThresholdPair: Decodable {
+    let enter: String
+    let exit: String
 
-    private struct Sequences: Decodable {
-        let thresholds: RawThresholds
-        let cases: [Case]
-    }
-
-    private struct RawThresholds: Decodable {
-        let sharpness: Pair
-        let meanLuma: Pair
-        let clippedFraction: Pair
-        let motion: Pair
-
-        struct Pair: Decodable {
-            let enter: String
-            let exit: String
-        }
-
-        var resolved: Thresholds {
-            Thresholds(
-                sharpness: threshold(sharpness),
-                meanLuma: threshold(meanLuma),
-                clippedFraction: threshold(clippedFraction),
-                motion: threshold(motion)
-            )
-        }
-
-        private func threshold(_ pair: Pair) -> Threshold {
-            Threshold(enter: Decimal(string: pair.enter) ?? .zero,
-                      exit: Decimal(string: pair.exit) ?? .zero)
-        }
-    }
-
-    private struct Case: Decodable {
-        let name: String
-        let holdFrames: Int
-        let frames: [Step]
-
-        struct Step: Decodable {
-            let sharpness: Double
-            let meanLuma: Double
-            let clipped: Double
-            let motion: Double
-            let expect: String
-
-            var metrics: FrameMetrics {
-                FrameMetrics(sharpness: sharpness,
-                             meanLuma: meanLuma,
-                             crushedFraction: 0,
-                             blownFraction: clipped,
-                             motion: motion)
-            }
-        }
+    var resolved: Threshold {
+        Threshold(enter: Decimal(string: enter) ?? .zero,
+                  exit: Decimal(string: exit) ?? .zero)
     }
 }
+
+private struct FixtureThresholds: Decodable {
+    let sharpness: ThresholdPair
+    let meanLuma: ThresholdPair
+    let clippedFraction: ThresholdPair
+    let motion: ThresholdPair
+
+    var resolved: Thresholds {
+        Thresholds(sharpness: sharpness.resolved,
+                   meanLuma: meanLuma.resolved,
+                   clippedFraction: clippedFraction.resolved,
+                   motion: motion.resolved)
+    }
+}
+
+private struct FixtureFrame: Decodable {
+    let sharpness: Double
+    let meanLuma: Double
+    let clipped: Double
+    let motion: Double
+    let expect: String
+
+    var metrics: FrameMetrics {
+        FrameMetrics(sharpness: sharpness,
+                     meanLuma: meanLuma,
+                     crushedFraction: 0,
+                     blownFraction: clipped,
+                     motion: motion)
+    }
+}
+
+private struct FixtureCase: Decodable {
+    let name: String
+    let holdFrames: Int
+    let frames: [FixtureFrame]
+}
+
+final class GateTests: XCTestCase {}
 
 // MARK: - Phase description
 
@@ -88,13 +83,13 @@ extension GateTests {
         }
     }
 
-    private func loadSequences() throws -> Sequences {
+    private func loadSequences() throws -> GateFixture {
         let url = try XCTUnwrap(
             Bundle.module.url(forResource: "gate_sequences",
                               withExtension: "json",
                               subdirectory: "Fixtures")
         )
-        return try JSONDecoder().decode(Sequences.self, from: Data(contentsOf: url))
+        return try JSONDecoder().decode(GateFixture.self, from: Data(contentsOf: url))
     }
 }
 
@@ -183,15 +178,30 @@ extension GateTests {
 
     func testTheRunStartsFreshOnTheNewStep() throws {
         let fired = try armAndFire(GateState(), stepCount: 3)
-        let next = Gate.advance(fired,
-                                metrics: passing,
-                                thresholds: try thresholds,
-                                holdFrames: 2,
-                                stepCount: 3,
-                                tick: 99)
 
-        XCTAssertEqual(describe(next.phase), "holding:1",
-                       "a new step does not inherit the previous run")
+        // The frame after firing only advances: the new step has a different region,
+        // so nothing has been measured for it yet.
+        let advanced = Gate.advance(fired,
+                                    metrics: passing,
+                                    thresholds: try thresholds,
+                                    holdFrames: 2,
+                                    stepCount: 3,
+                                    tick: 99)
+
+        XCTAssertEqual(advanced.verdicts, .unmeasured,
+                       "the previous step's verdicts say nothing about the new region")
+        XCTAssertEqual(describe(advanced.phase), "blocked:sharpness,underexposed,overexposed,motion")
+
+        // The next frame is the first one actually measured against the new step.
+        let measured = Gate.advance(advanced,
+                                    metrics: passing,
+                                    thresholds: try thresholds,
+                                    holdFrames: 2,
+                                    stepCount: 3,
+                                    tick: 100)
+
+        XCTAssertEqual(describe(measured.phase), "holding:1",
+                       "the run starts from zero on the new step")
     }
 
     func testFiringTheLastStepCompletesThePlan() throws {
