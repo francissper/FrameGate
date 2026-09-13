@@ -256,9 +256,44 @@ compare against.
 
 ## Gate
 
+One pure function from state, metrics, thresholds and a tick to a new state. The
+tick is passed in rather than read from a clock inside, so a test can drive the
+gate frame by frame with no waiting and no ambiguity about when a transition
+happened.
+
 ### States
 
+`blocked` carries the set of failing metrics — a set rather than one reason,
+because several can fail at once and the HUD picks which to name. It is never
+empty: with nothing failing the phase is `holding` or `armed` instead.
+`holding` carries the run so far and what it needs. `armed` is the only phase in
+which the shutter is enabled. `fired` is transient: the following frame moves to
+the next step, or completes the plan if there is none.
+
 ### Smoothing and hysteresis
+
+Each metric carries two thresholds and its verdict is held between frames. A
+verdict flips to passing only once the value crosses `enter`, and back to
+failing only once it crosses `exit`; between them it keeps whatever it had.
+Without that band a value hovering on a single threshold flips the verdict every
+frame, the run never accumulates, and the shutter chatters.
+
+The band is asymmetric by design, and two cases in `gate_sequences.json` prove
+it: the same mid-band value keeps a passing verdict if it was already passing,
+and cannot start a run if it was not.
+
+Direction differs per metric. Sharpness and mean luma pass by rising; clipping
+and motion pass by falling, so their bands run the other way.
+
+### The hold counter
+
+Counted in frames, never on a timer, and reset to zero — not decremented — by
+any failing frame. A timer would elapse regardless of how many frames actually
+arrived, arming the shutter on evidence that was never gathered.
+
+A new step starts from `unmeasured`: its region is different, so the previous
+step's verdicts say nothing about it. This mirrors `LumaAnalyzer.reset()`, which
+discards the previous downsample for the same reason.
 
 ## Upload queue
 

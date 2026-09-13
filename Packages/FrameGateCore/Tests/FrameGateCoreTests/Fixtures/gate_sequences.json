@@ -1,0 +1,98 @@
+{
+  "thresholds": {
+    "sharpness": { "enter": "0.60", "exit": "0.45" },
+    "meanLuma": { "enter": "0.35", "exit": "0.25" },
+    "clippedFraction": { "enter": "0.05", "exit": "0.10" },
+    "motion": { "enter": "0.02", "exit": "0.04" }
+  },
+  "cases": [
+    {
+      "name": "a clean run arms on the last required frame",
+      "holdFrames": 4,
+      "frames": [
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:1" },
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:2" },
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:3" },
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "armed" }
+      ]
+    },
+    {
+      "name": "one failing frame resets the run to zero",
+      "holdFrames": 4,
+      "frames": [
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:1" },
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:2" },
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:3" },
+        { "sharpness": 0.10, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "blocked:sharpness" },
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:1" }
+      ]
+    },
+    {
+      "name": "a value inside the band keeps its previous verdict",
+      "holdFrames": 8,
+      "frames": [
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:1" },
+        { "sharpness": 0.50, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:2" },
+        { "sharpness": 0.55, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:3" },
+        { "sharpness": 0.50, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:4" },
+        { "sharpness": 0.44, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "blocked:sharpness" }
+      ]
+    },
+    {
+      "name": "a value inside the band cannot start a run on its own",
+      "holdFrames": 4,
+      "frames": [
+        { "sharpness": 0.50, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "blocked:sharpness" },
+        { "sharpness": 0.55, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "blocked:sharpness" },
+        { "sharpness": 0.61, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:1" }
+      ]
+    },
+    {
+      "name": "a metric oscillating around enter does not chatter",
+      "holdFrames": 6,
+      "frames": [
+        { "sharpness": 0.61, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:1" },
+        { "sharpness": 0.59, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:2" },
+        { "sharpness": 0.61, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:3" },
+        { "sharpness": 0.58, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:4" },
+        { "sharpness": 0.60, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:5" },
+        { "sharpness": 0.59, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "armed" }
+      ]
+    },
+    {
+      "name": "every failing metric is reported, not just the first",
+      "holdFrames": 4,
+      "frames": [
+        { "sharpness": 0.10, "meanLuma": 0.10, "clipped": 0.30, "motion": 0.50, "expect": "blocked:sharpness,underexposed,overexposed,motion" }
+      ]
+    },
+    {
+      "name": "motion and clipping pass by being low, not high",
+      "holdFrames": 2,
+      "frames": [
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.30, "motion": 0.01, "expect": "blocked:overexposed" },
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.50, "expect": "blocked:motion" },
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:1" },
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "armed" }
+      ]
+    },
+    {
+      "name": "an armed gate stays armed while the metrics hold",
+      "holdFrames": 2,
+      "frames": [
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:1" },
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "armed" },
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "armed" }
+      ]
+    },
+    {
+      "name": "an armed gate falls back to blocked when a metric drops out",
+      "holdFrames": 2,
+      "frames": [
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "holding:1" },
+        { "sharpness": 0.80, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "armed" },
+        { "sharpness": 0.10, "meanLuma": 0.50, "clipped": 0.01, "motion": 0.01, "expect": "blocked:sharpness" }
+      ]
+    }
+  ]
+}
