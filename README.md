@@ -122,6 +122,25 @@ Steps 1–3 survive, steps 4–7 are skipped; the table above says why for each.
 
 ## Frame source
 
+The Simulator has no camera, so `ReplayFrameSource` plays back a pre-built
+sequence of buffers at a fixed rate. A real `AVCaptureSession` would sit behind
+the same `FrameSource` protocol without anything downstream changing.
+
+Patterns are generated rather than bundled so the test data is readable in the
+source: exactly where the sharp edge sits, exactly how dark the dark frame is.
+Each one isolates a single metric — the checkerboard is sharp and well exposed,
+the ramp fails sharpness alone, the flat dark field fails exposure, and the
+half-sharp frame flips its verdict depending on which side of the midline the
+ROI falls. The checker uses 16 and 235, the video-range limits, so the reference
+frame is maximally sharp without registering as clipped.
+
+Backpressure is a single slot behind an `os_unfair_lock`, not a buffered
+publisher. When the consumer falls behind, the newest frame overwrites the slot
+and the previous one is counted as dropped: there is no queue to grow, so
+latency never accumulates. The drop count is published separately because the
+HUD needs it as evidence that the backpressure is real — a buffered operator
+would discard silently and leave nothing to show.
+
 ## ROI mapping
 
 The plan's region is normalized against the **sensor buffer**, not the view. A
