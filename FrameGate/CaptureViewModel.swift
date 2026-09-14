@@ -108,7 +108,7 @@ private extension CaptureViewModel {
         let holdProgress = holdProgress(for: tick.gate.phase, required: step.holdFrames)
 
         state.stepText = "Step \(stepIndex + 1) of \(container.plan.steps.count)"
-        state.phaseText = phaseText(for: tick.gate.phase)
+        state.phaseText = phaseText(for: tick.gate)
         state.blockingText = blockingText(for: tick.gate)
         state.millisecondsText = String(format: "%.1f ms/frame", tick.millisecondsPerFrame)
         state.droppedText = "\(tick.framesDropped) dropped"
@@ -120,13 +120,16 @@ private extension CaptureViewModel {
         state.motionState = tick.gate.verdicts.motion ? "ok" : "fail"
         state.outline = tick.outline
         state.goodFramesText = "\(holdProgress.current) / \(holdProgress.required) good frames"
-        state.shutterText = tick.gate.phase == .armed ? "on" : "off"
-        state.shutterSubtitle = tick.gate.phase == .armed ? "shutter enabled" : "shutter disabled"
-        state.isShutterEnabled = tick.gate.phase == .armed
+        let isShutterEnabled = tick.gate.phase == .armed && !tick.gate.isComplete
+        state.shutterText = isShutterEnabled ? "on" : "off"
+        state.shutterSubtitle = isShutterEnabled ? "shutter enabled" : "shutter disabled"
+        state.isShutterEnabled = isShutterEnabled
     }
 
-    func phaseText(for phase: GatePhase) -> String {
-        switch phase {
+    func phaseText(for gate: GateState) -> String {
+        if gate.isComplete { return "complete" }
+
+        switch gate.phase {
         case .blocked:
             return "blocked"
         case .holding:
