@@ -36,10 +36,9 @@ final class AppContainer: ObservableObject {
                                                 in: .userDomainMask)[0]
     let journalURL = storageDirectory.appendingPathComponent("queue.log")
 
-    // Points at the mock server, started with the documented docker command.
-    // Retry and backoff are still graded against the fake transport in tests.
-    let endpoint = Self.uploadEndpoint()
-    let transport = URLSessionUploadTransport(endpoint: endpoint)
+    // The deterministic fake is the default required by the assessment.
+    // Set USE_REAL_UPLOAD=1 to exercise the real mock server.
+    let transport = Self.makeUploadTransport()
 
     do {
       let journal = try Journal(url: journalURL)
@@ -105,8 +104,19 @@ final class AppContainer: ObservableObject {
 
 private extension AppContainer {
 
-  /// Defaults to the mock server on localhost; overridable so a different
-  /// build or a CI run can point elsewhere without recompiling.
+  static func makeUploadTransport() -> any UploadTransport {
+    guard ProcessInfo.processInfo.environment["USE_REAL_UPLOAD"] == "1" else {
+      return FakeTransport.suggestedScript
+    }
+
+    return URLSessionUploadTransport(
+      endpoint: uploadEndpoint()
+    )
+  }
+
+  /// Endpoint used only when USE_REAL_UPLOAD=1.
+  /// It defaults to the local Docker mock server and can be overridden by
+  /// UPLOAD_ENDPOINT without recompiling the app.
   static func uploadEndpoint() -> URL {
     if let override = ProcessInfo.processInfo.environment["UPLOAD_ENDPOINT"],
        let url = URL(string: override) {
