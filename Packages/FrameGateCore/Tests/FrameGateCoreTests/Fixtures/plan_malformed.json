@@ -36,8 +36,7 @@
       "thresholds": {
         "sharpness": { "enter": "0.40" },
         "meanLuma": { "enter": "0.30", "exit": "0.20" },
-        "clippedFraction": { "enter": "0.10", "exit": "0.15" },
-        "motion": { "enter": "0.04", "exit": "0.07" }
+        "clippedFraction": { "enter": "0.10", "exit": "0.15" }
       },
       "HoldFrames": 5,
       "retryPolicy": { "attempts": 2 }
