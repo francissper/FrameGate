@@ -8,10 +8,13 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var container = AppContainer()
+
     var body: some View {
         NavigationStack {
-            CaptureView()
+            CaptureView(container: container)
         }
+        .task { await container.restoreQueue() }
     }
 }
 

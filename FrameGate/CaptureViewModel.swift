@@ -28,7 +28,6 @@ struct CaptureScreenState: Equatable {
     var shutterText: String = "off"
     var shutterSubtitle: String = "shutter disabled"
     var isShutterEnabled = false
-    var errorText: String?
 }
 
 enum CaptureEvent {
@@ -38,43 +37,23 @@ enum CaptureEvent {
     case shutterTapped
 }
 
-enum CaptureEffect {
-    case acceptedStep(String)
-}
-
 @MainActor
 final class CaptureViewModel: ObservableObject {
 
     @Published private(set) var state: CaptureScreenState
 
-    let effects = PassthroughSubject<CaptureEffect, Never>()
-
-    private let plan: Plan
-    private let pipeline: CapturePipeline?
+    private let container: AppContainer
     private var cancellables: Set<AnyCancellable> = []
     private var isRunning = false
 
-    init() {
-        switch Self.makePipeline() {
-        case .success(let dependencies):
-            plan = dependencies.plan
-            pipeline = dependencies.pipeline
-            state = CaptureScreenState(
-                stepText: "Step 1 of \(dependencies.plan.steps.count)",
-                goodFramesText: "0 / \(dependencies.plan.steps[0].holdFrames) good frames"
-            )
-            bindPipeline(dependencies.pipeline)
-
-        case .failure(let error):
-            let fallbackPlan = Self.fallbackPlan()
-            plan = fallbackPlan
-            pipeline = nil
-            state = CaptureScreenState(
-                phaseText: "unavailable",
-                goodFramesText: "0 / \(fallbackPlan.steps[0].holdFrames) good frames",
-                errorText: error.message
-            )
-        }
+    init(container: AppContainer) {
+        self.container = container
+        state = CaptureScreenState(
+            stepText: "Step 1 of \(container.plan.steps.count)",
+            goodFramesText: "0 / \(container.plan.steps[0].holdFrames) good frames"
+        )
+        bindPipeline(container.pipeline)
+        bindQueueCount(container.queue)
     }
 
     func send(_ event: CaptureEvent) {
@@ -84,92 +63,51 @@ final class CaptureViewModel: ObservableObject {
         case .disappeared:
             stop()
         case .geometryChanged(let size):
-            pipeline?.updateGeometry(viewSize: size,
-                                     orientation: .portrait,
-                                     fillMode: .aspectFit)
+            container.pipeline.updateGeometry(viewSize: size,
+                                              orientation: .portrait,
+                                              fillMode: .aspectFit)
         case .shutterTapped:
-            guard let step = pipeline?.fire() else { return }
-            effects.send(.acceptedStep(step.id))
+            guard let shot = container.pipeline.fire() else { return }
+            Task { await container.enqueue(shot) }
         }
     }
 }
 
 private extension CaptureViewModel {
 
-    struct Dependencies {
-        let plan: Plan
-        let pipeline: CapturePipeline
-    }
-
-    struct SetupError: Error {
-        let message: String
-    }
-
-    static func makePipeline() -> Result<Dependencies, SetupError> {
-        let plan = fallbackPlan()
-        let size = CGSize(width: 160, height: 120)
-        let patterns: [PatternGenerator.Pattern] = [.sharp, .sharp, .sharp, .sharpLeftHalf]
-        let buffers = patterns.compactMap { PatternGenerator.makeBuffer($0, size: size) }
-
-        guard !buffers.isEmpty else {
-            return .failure(SetupError(message: "replay frames unavailable"))
-        }
-
-        let source = ReplayFrameSource(buffers: buffers, frameRate: 60)
-        let pipeline = CapturePipeline(source: source, plan: plan)
-        return .success(Dependencies(plan: plan, pipeline: pipeline))
-    }
-
-    static func fallbackPlan() -> Plan {
-        let thresholds = Thresholds(
-            sharpness: Threshold(enter: 0.5, exit: 0.4),
-            meanLuma: Threshold(enter: 0.1, exit: 0.05),
-            clippedFraction: Threshold(enter: 0.5, exit: 0.6),
-            motion: Threshold(enter: 0.5, exit: 0.6)
-        )
-        let step = Step(id: "front-label",
-                        kind: .single,
-                        label: "Front label",
-                        roi: fullFrameRegion(),
-                        thresholds: thresholds,
-                        holdFrames: 8)
-        return Plan(id: "simulator-replay", createdAt: Date(), steps: [step])
-    }
-
-    static func fullFrameRegion() -> NormalizedRegion {
-        guard let region = NormalizedRegion(x: 0, y: 0, width: 1, height: 1) else {
-            preconditionFailure("The full-frame normalized region should always be valid.")
-        }
-        return region
-    }
-
     func bindPipeline(_ pipeline: CapturePipeline) {
         pipeline.ticks
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] tick in
-                self?.apply(tick)
-            }
+            .sink { [weak self] tick in self?.apply(tick) }
+            .store(in: &cancellables)
+    }
+
+    func bindQueueCount(_ queue: UploadQueue) {
+        queue.state
+            .receive(on: DispatchQueue.main)
+            .map(\.count)
+            .sink { [weak self] count in self?.state.queueCount = count }
             .store(in: &cancellables)
     }
 
     func start() {
         guard !isRunning else { return }
         isRunning = true
-        pipeline?.start()
+        container.pipeline.start()
     }
 
     func stop() {
         guard isRunning else { return }
         isRunning = false
-        pipeline?.stop()
+        container.pipeline.stop()
     }
 
     func apply(_ tick: CaptureTick) {
-        let stepIndex = min(tick.gate.stepIndex, max(plan.steps.count - 1, 0))
-        let step = plan.steps[stepIndex]
+        let stepIndex = min(tick.gate.stepIndex, max(container.plan.steps.count - 1, 0))
+        let step = container.plan.steps[stepIndex]
         let holdProgress = holdProgress(for: tick.gate.phase, required: step.holdFrames)
 
-        state.stepText = "Step \(stepIndex + 1) of \(plan.steps.count)"
+        state.stepText = "Step \(stepIndex + 1) of \(container.plan.steps.count)"
         state.phaseText = phaseText(for: tick.gate.phase)
         state.blockingText = blockingText(for: tick.gate)
         state.millisecondsText = String(format: "%.1f ms/frame", tick.millisecondsPerFrame)
@@ -185,7 +123,6 @@ private extension CaptureViewModel {
         state.shutterText = tick.gate.phase == .armed ? "on" : "off"
         state.shutterSubtitle = tick.gate.phase == .armed ? "shutter enabled" : "shutter disabled"
         state.isShutterEnabled = tick.gate.phase == .armed
-        state.errorText = nil
     }
 
     func phaseText(for phase: GatePhase) -> String {

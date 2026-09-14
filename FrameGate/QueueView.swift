@@ -8,36 +8,36 @@
 import SwiftUI
 
 struct QueueView: View {
-    private let rows = [
-        QueueRow(title: "IMG_0412.heic", detail: "uploading - attempt 1", canRetry: false),
-        QueueRow(title: "IMG_0411.heic", detail: "pending - attempt 2 - next attempt 09:44", canRetry: false),
-        QueueRow(title: "IMG_0410.heic", detail: "failed - attempt 3", canRetry: true),
-        QueueRow(title: "IMG_0409.heic", detail: "uploaded - attempt 1", canRetry: false),
-        QueueRow(title: "IMG_0408.heic", detail: "pending - attempt 1 - next attempt 09:47", canRetry: false)
-    ]
+    @StateObject private var viewModel: QueueViewModel
+
+    init(container: AppContainer) {
+        _viewModel = StateObject(wrappedValue: QueueViewModel(container: container))
+    }
 
     var body: some View {
-        List(rows) { row in
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(row.title)
-                        .font(.subheadline.monospaced())
-                    Text(row.detail)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                if row.canRetry {
-                    Button("Retry") {
+        Group {
+            if viewModel.rows.isEmpty {
+                Text("No pending captures.")
+                    .foregroundStyle(.secondary)
+            } else {
+                List(viewModel.rows) { row in
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(row.title).font(.subheadline.monospaced())
+                            Text(row.detail).font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if row.canRetry {
+                            Button("Retry") { viewModel.retryTapped(row.id) }
+                                .buttonStyle(.bordered)
+                        }
                     }
-                    .buttonStyle(.bordered)
+                    .padding(.vertical, 6)
                 }
+                .listStyle(.plain)
             }
-            .padding(.vertical, 6)
         }
-        .listStyle(.plain)
         .navigationTitle("Queue")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
@@ -52,15 +52,8 @@ struct QueueView: View {
     }
 }
 
-private struct QueueRow: Identifiable {
-    let id = UUID()
-    let title: String
-    let detail: String
-    let canRetry: Bool
-}
-
 #Preview {
     NavigationStack {
-        QueueView()
+        QueueView(container: AppContainer())
     }
 }

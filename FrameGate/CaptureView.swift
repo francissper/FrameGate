@@ -8,11 +8,17 @@
 import SwiftUI
 
 struct CaptureView: View {
-    @StateObject private var viewModel = CaptureViewModel()
+    @StateObject private var viewModel: CaptureViewModel
+    private let container: AppContainer
+
+    init(container: AppContainer) {
+        self.container = container
+        _viewModel = StateObject(wrappedValue: CaptureViewModel(container: container))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            CaptureHeader(queueCount: viewModel.state.queueCount)
+            CaptureHeader(queueCount: viewModel.state.queueCount, container: container)
             CapturePreviewArea(state: viewModel.state) { event in
                 viewModel.send(event)
             }
@@ -29,6 +35,7 @@ struct CaptureView: View {
 
 private struct CaptureHeader: View {
     let queueCount: Int
+    let container: AppContainer
 
     var body: some View {
         HStack {
@@ -38,7 +45,7 @@ private struct CaptureHeader: View {
             Spacer()
 
             NavigationLink {
-                QueueView()
+                QueueView(container: container)
             } label: {
                 Text("Queue (\(queueCount))")
                     .font(.subheadline)
@@ -86,18 +93,6 @@ private struct CapturePreviewArea: View {
                     }
                     .padding(.leading, 32)
                     .padding(.bottom, 112)
-                }
-
-                if let errorText = state.errorText {
-                    Text(errorText)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.red)
-                        .padding(10)
-                        .background(Color(.systemBackground))
-                        .overlay {
-                            Rectangle().stroke(Color(.separator), lineWidth: 1)
-                        }
-                        .padding(16)
                 }
             }
         }
@@ -214,6 +209,6 @@ private struct ShutterPanel: View {
 
 #Preview {
     NavigationStack {
-        CaptureView()
+        CaptureView(container: AppContainer())
     }
 }
