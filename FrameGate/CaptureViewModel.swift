@@ -66,13 +66,18 @@ final class CaptureViewModel: ObservableObject {
     case .geometryChanged(let size):
       updateGeometry(size)
     case .shutterTapped:
-      guard let shot = container.pipeline.fire() else { return }
-      Task { await container.enqueue(shot) }
+      container.pipeline.requestFire()
     }
   }
 }
 
 private extension CaptureViewModel {
+
+  func enqueue(_ shot: CapturedShot) {
+    Task {
+      await container.enqueue(shot)
+    }
+  }
 
   func updateGeometry(_ size: CGSize) {
     container.pipeline.updateGeometry(
@@ -118,7 +123,16 @@ private extension CaptureViewModel {
   func bindPipeline(_ pipeline: CapturePipeline) {
     pipeline.ticks
       .receive(on: DispatchQueue.main)
-      .sink { [weak self] tick in self?.apply(tick) }
+      .sink { [weak self] tick in
+        self?.apply(tick)
+      }
+      .store(in: &cancellables)
+
+    pipeline.shots
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] shot in
+        self?.enqueue(shot)
+      }
       .store(in: &cancellables)
   }
 

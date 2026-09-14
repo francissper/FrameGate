@@ -9,9 +9,9 @@ import CoreImage
 import ImageIO
 import UniformTypeIdentifiers
 
-/// Encodes one accepted shot to JPEG. This runs once per capture, never on the
-/// per-frame path — the ban on CGImage/CoreImage in the brief is about the
-/// steady-state measurement loop, not about saving the shot the gate armed.
+/// Encodes one accepted shot to JPEG. It runs only when a capture request is
+/// accepted, never on steady-state frames. Encoding finishes before the source
+/// frame callback returns, so the `CVPixelBuffer` is not retained by the pipeline.
 public enum JPEGEncoder {
 
     public static func encode(_ buffer: CVPixelBuffer, quality: CGFloat = 0.9) -> Data? {

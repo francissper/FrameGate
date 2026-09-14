@@ -65,33 +65,34 @@ final class AppContainer: ObservableObject {
     drainTimer = nil
   }
 
-  /// Encodes the shot, builds its manifest, and enqueues both. Called from
-  /// the capture screen's one-shot effect — never from the frame path.
+  /// Builds the manifest for an accepted shot and persists both payloads.
+  /// The pipeline has already encoded the source frame before its callback ended.
   func enqueue(_ shot: CapturedShot) async {
-    guard let frameData = JPEGEncoder.encode(shot.buffer) else { return }
+      let manifest = CaptureManifest(
+          captureID: UUID(),
+          planID: plan.id,
+          planCreatedAt: plan.createdAt,
+          stepID: shot.step.id,
+          capturedAt: Date(),
+          sensorRotation: shot.sensorRotation,
+          displayOrientation: shot.displayOrientation,
+          mirrored: shot.mirrored,
+          region: shot.step.roi,
+          metrics: shot.metrics,
+          holdFramesRequired: shot.step.holdFrames,
+          framesDropped: shot.framesDropped
+      )
 
-    let manifest = CaptureManifest(
-      captureID: UUID(),
-      planID: plan.id,
-      planCreatedAt: plan.createdAt,
-      stepID: shot.step.id,
-      capturedAt: Date(),
-      sensorRotation: shot.sensorRotation,
-      displayOrientation: shot.displayOrientation,
-      mirrored: shot.mirrored,
-      region: shot.step.roi,
-      metrics: shot.metrics,
-      holdFramesRequired: shot.step.holdFrames,
-      framesDropped: shot.framesDropped
-    )
+      guard let manifestData = try? ManifestEncoder.encode(manifest) else {
+          return
+      }
 
-    guard let manifestData = try? ManifestEncoder.encode(manifest) else { return }
-
-    try? await queue.enqueue(manifest: manifestData,
-                             frame: frameData,
-                             captureID: manifest.captureID)
-  }
-}
+      try? await queue.enqueue(
+          manifest: manifestData,
+          frame: shot.frameData,
+          captureID: manifest.captureID
+      )
+  }}
 
 // MARK: - Plan loading
 
