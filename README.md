@@ -38,11 +38,14 @@ docker run -p 8080:8080 framegate-mock
 
 The app points at `http://localhost:8080/v1/captures` via
 `URLSessionUploadTransport`. On the Simulator, `localhost` resolves to the host
-Mac, so no extra networking setup is needed. The first idempotency key
-exercises the brief's suggested script — 503, 503, timeout, 500, 201 — and
-settles as `uploaded`; every key after that succeeds on the first attempt.
-Retry and backoff timing are graded against `FakeTransport` in the test suite,
-not against this server.
+Mac, so no extra networking setup is needed. To point at a different endpoint
+without recompiling, set `UPLOAD_ENDPOINT` in Xcode under Product -> Scheme ->
+Edit Scheme -> Run -> Arguments -> Environment Variables.
+
+The first idempotency key exercises the brief's suggested script — 503, 503,
+timeout, 500, 201 — and settles as `uploaded`; every key after that succeeds on
+the first attempt. Retry and backoff timing are graded against `FakeTransport`
+in the test suite, not against this server.
 
 ## Plan format
 
