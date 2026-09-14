@@ -180,16 +180,7 @@ private extension CapturePipeline {
 
     let step = plan.steps[gate.stepIndex]
     let startedAt = CFAbsoluteTimeGetCurrent()
-
-    let mapped = ROIMapper.map(
-      step.roi,
-      bufferSize: frame.size,
-      sensorRotation: frame.sensorRotation,
-      mirrored: frame.mirrored,
-      displayOrientation: displayOrientation,
-      viewSize: viewSize,
-      fillMode: fillMode
-    )
+    let mapped = mappedRegion(for: frame, step: step)
 
     guard let metrics = analyzer.analyze(
       frame.buffer,
@@ -200,55 +191,24 @@ private extension CapturePipeline {
 
     frameCount += 1
 
-    var nextGate = Gate.advance(
-      gate,
+    let dropped = currentDroppedCount()
+    var nextGate = advancedGate(for: step, metrics: metrics)
+    let capturedShot = consumeCaptureRequest(
+      frame: frame,
+      step: step,
       metrics: metrics,
-      thresholds: step.thresholds,
-      holdFrames: step.holdFrames,
-      stepCount: plan.steps.count,
-      tick: frameCount
+      dropped: dropped,
+      nextGate: &nextGate
     )
 
-    let dropped = currentDroppedCount()
-    var capturedShot: CapturedShot?
-
-    if captureRequested {
-      captureRequested = false
-
-      if nextGate.phase == .armed,
-         let frameData = JPEGEncoder.encode(frame.buffer) {
-        nextGate = Gate.fire(
-          nextGate,
-          tick: frameCount
-        )
-
-        analyzer.reset()
-
-        capturedShot = CapturedShot(
-          step: step,
-          frameData: frameData,
-          sensorRotation: frame.sensorRotation,
-          mirrored: frame.mirrored,
-          displayOrientation: displayOrientation,
-          metrics: metrics,
-          framesDropped: dropped
-        )
-      }
-    }
-
     gate = nextGate
-
-    let elapsed = (CFAbsoluteTimeGetCurrent() - startedAt) * 1000
-
-    averageMilliseconds = averageMilliseconds == 0
-    ? elapsed
-    : averageMilliseconds * 0.9 + elapsed * 0.1
+    let millisecondsPerFrame = recordElapsedTime(since: startedAt)
 
     let tick = CaptureTick(
       gate: gate,
       metrics: metrics,
       outline: mapped.view,
-      millisecondsPerFrame: averageMilliseconds,
+      millisecondsPerFrame: millisecondsPerFrame,
       framesDropped: dropped
     )
 
@@ -256,6 +216,71 @@ private extension CapturePipeline {
       tick: tick,
       shot: capturedShot
     )
+  }
+
+  private func mappedRegion(for frame: Frame, step: Step) -> MappedRegion {
+    ROIMapper.map(
+      step.roi,
+      bufferSize: frame.size,
+      sensorRotation: frame.sensorRotation,
+      mirrored: frame.mirrored,
+      displayOrientation: displayOrientation,
+      viewSize: viewSize,
+      fillMode: fillMode
+    )
+  }
+
+  private func advancedGate(for step: Step, metrics: FrameMetrics) -> GateState {
+    Gate.advance(
+      gate,
+      metrics: metrics,
+      thresholds: step.thresholds,
+      holdFrames: step.holdFrames,
+      stepCount: plan.steps.count,
+      tick: frameCount
+    )
+  }
+
+  private func consumeCaptureRequest(
+    frame: Frame,
+    step: Step,
+    metrics: FrameMetrics,
+    dropped: Int,
+    nextGate: inout GateState
+  ) -> CapturedShot? {
+    guard captureRequested else {
+      return nil
+    }
+
+    captureRequested = false
+
+    guard nextGate.phase == .armed,
+          let frameData = JPEGEncoder.encode(frame.buffer) else {
+      return nil
+    }
+
+    nextGate = Gate.fire(nextGate, tick: frameCount)
+    analyzer.reset()
+
+    return CapturedShot(
+      step: step,
+      frameData: frameData,
+      sensorRotation: frame.sensorRotation,
+      mirrored: frame.mirrored,
+      displayOrientation: displayOrientation,
+      metrics: metrics,
+      framesDropped: dropped
+    )
+  }
+
+  private func recordElapsedTime(since startedAt: CFAbsoluteTime) -> Double {
+    let elapsed = (CFAbsoluteTimeGetCurrent() - startedAt) * 1000
+
+    averageMilliseconds = averageMilliseconds == 0
+    ? elapsed
+    : averageMilliseconds * 0.9 + elapsed * 0.1
+
+    return averageMilliseconds
   }
 
   func setDroppedCount(_ count: Int) {
