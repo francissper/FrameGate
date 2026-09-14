@@ -38,10 +38,8 @@ final class AppContainer: ObservableObject {
 
         // Points at the mock server, started with the documented docker command.
         // Retry and backoff are still graded against the fake transport in tests.
-        guard let transportURL = URL(string: "http://localhost:8080/v1/captures") else {
-            preconditionFailure("Invalid upload endpoint")
-        }
-        let transport = URLSessionUploadTransport(endpoint: transportURL)
+        let endpoint = Self.uploadEndpoint()
+        let transport = URLSessionUploadTransport(endpoint: endpoint)
 
         do {
             let journal = try Journal(url: journalURL)
@@ -98,6 +96,20 @@ final class AppContainer: ObservableObject {
 // MARK: - Plan loading
 
 private extension AppContainer {
+
+    /// Defaults to the mock server on localhost; overridable so a different
+    /// build or a CI run can point elsewhere without recompiling.
+    static func uploadEndpoint() -> URL {
+        if let override = ProcessInfo.processInfo.environment["UPLOAD_ENDPOINT"],
+           let url = URL(string: override) {
+            return url
+        }
+
+        guard let url = URL(string: "http://localhost:8080/v1/captures") else {
+            preconditionFailure("Invalid default upload endpoint")
+        }
+        return url
+    }
 
     struct LoadedPlan {
         let plan: Plan
