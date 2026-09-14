@@ -9,7 +9,6 @@ import Foundation
 import FrameGateCore
 import Combine
 
-
 /// The composition root. One instance, created once, handed to both screens.
 /// Nothing here is a singleton — it is built by hand and passed down, which is
 /// the dependency injection the brief asks for.
