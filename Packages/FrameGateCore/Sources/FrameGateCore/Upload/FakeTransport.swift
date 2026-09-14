@@ -8,65 +8,120 @@
 import Foundation
 import os
 
-/// One line of the request log. This is what proves send-once: a key that
-/// appears twice with a `stored` outcome would mean the shot went up twice.
+/// One line of the request log.
+///
+/// Repeated attempts for one capture intentionally reuse the same idempotency
+/// key. A successful stored outcome for two different keys represents two
+/// different captures, not a duplicate upload.
 public struct TransportLogEntry: Equatable, Sendable {
     public let idempotencyKey: UUID
     public let attempt: Int
     public let outcome: UploadOutcome
 }
 
-/// A transport driven by a scripted list of outcomes rather than a network.
-/// Each capture gets its own position in the script, so the first shot can be
-/// made to fail four times while later ones succeed immediately.
+/// A deterministic transport used by the queue tests.
+///
+/// The scripted outcomes apply only to the first capture observed by the
+/// transport. Every later capture returns `thereafter` immediately, matching
+/// the failure scenario required by the assessment.
 public final class FakeTransport: UploadTransport, @unchecked Sendable {
 
     private struct State {
+        var firstCaptureID: UUID?
         var attemptsByKey: [UUID: Int] = [:]
         var log: [TransportLogEntry] = []
     }
 
     private let script: [UploadOutcome]
     private let fallback: UploadOutcome
-    private let protected = OSAllocatedUnfairLock(initialState: State())
+    private let protected = OSAllocatedUnfairLock(
+        initialState: State()
+    )
 
     /// - Parameters:
-    ///   - script: outcomes for the first shot, in order.
-    ///   - thereafter: what every attempt beyond the script returns.
-    public init(script: [UploadOutcome],
-                thereafter: UploadOutcome = .stored(duplicate: false)) {
+    ///   - script: Outcomes applied, in order, to the first capture only.
+    ///   - thereafter: Outcome returned by captures after the first one, and
+    ///     by attempts beyond the scripted sequence.
+    public init(
+        script: [UploadOutcome],
+        thereafter: UploadOutcome = .stored(duplicate: false)
+    ) {
         self.script = script
-        self.fallback = thereafter
+        fallback = thereafter
     }
 
-    /// The brief's suggested script for the first shot.
+    /// The failure sequence suggested by the assessment:
+    /// 503, 503, timeout, 500, 201.
     public static var suggestedScript: FakeTransport {
-        FakeTransport(script: [
-            .retryable(retryAfter: nil),   // 503
-            .retryable(retryAfter: nil),   // 503
-            .timedOut,                      // no response at all
-            .retryable(retryAfter: nil),   // 500
-            .stored(duplicate: false)      // 201
-        ])
+        FakeTransport(
+            script: [
+                .retryable(retryAfter: nil),
+                .retryable(retryAfter: nil),
+                .timedOut,
+                .retryable(retryAfter: nil),
+                .stored(duplicate: false)
+            ]
+        )
     }
 
-    public func send(manifest: Data,
-                     frame: Data,
-                     idempotencyKey: UUID) async -> UploadOutcome {
+    public func send(
+        manifest: Data,
+        frame: Data,
+        idempotencyKey: UUID
+    ) async -> UploadOutcome {
         protected.withLock { state in
-            let attempt = (state.attemptsByKey[idempotencyKey] ?? 0) + 1
+            if state.firstCaptureID == nil {
+                state.firstCaptureID = idempotencyKey
+            }
+
+            let attempt =
+                (state.attemptsByKey[idempotencyKey] ?? 0) + 1
+
             state.attemptsByKey[idempotencyKey] = attempt
 
-            let outcome = attempt <= script.count ? script[attempt - 1] : fallback
-            state.log.append(TransportLogEntry(idempotencyKey: idempotencyKey,
-                                               attempt: attempt,
-                                               outcome: outcome))
+            let outcome = outcome(
+                for: idempotencyKey,
+                attempt: attempt,
+                firstCaptureID: state.firstCaptureID
+            )
+
+            state.log.append(
+                TransportLogEntry(
+                    idempotencyKey: idempotencyKey,
+                    attempt: attempt,
+                    outcome: outcome
+                )
+            )
+
             return outcome
         }
     }
 
-    /// Every request that was made, in order.
+    /// Every request made by the transport, in order.
     public var requests: [TransportLogEntry] {
-        protected.withLock { $0.log }
+        protected.withLock {
+            $0.log
+        }
+    }
+}
+
+// MARK: - Outcome selection
+
+private extension FakeTransport {
+
+    func outcome(
+        for captureID: UUID,
+        attempt: Int,
+        firstCaptureID: UUID?
+    ) -> UploadOutcome {
+        guard captureID == firstCaptureID else {
+            return fallback
+        }
+
+        guard attempt <= script.count else {
+            return fallback
+        }
+
+        return script[attempt - 1]
     }
 }
