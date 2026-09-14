@@ -65,34 +65,41 @@ final class AppContainer: ObservableObject {
     drainTimer = nil
   }
 
-  /// Builds the manifest for an accepted shot and persists both payloads.
-  /// The pipeline has already encoded the source frame before its callback ended.
-  func enqueue(_ shot: CapturedShot) async {
-      let manifest = CaptureManifest(
-          captureID: UUID(),
-          planID: plan.id,
-          planCreatedAt: plan.createdAt,
-          stepID: shot.step.id,
-          capturedAt: Date(),
-          sensorRotation: shot.sensorRotation,
-          displayOrientation: shot.displayOrientation,
-          mirrored: shot.mirrored,
-          region: shot.step.roi,
-          metrics: shot.metrics,
-          holdFramesRequired: shot.step.holdFrames,
-          framesDropped: shot.framesDropped
+  /// Builds the manifest and durably enqueues the accepted capture.
+  ///
+  /// Returns `true` only after both payloads have been persisted by the queue.
+  func enqueue(_ shot: CapturedShot) async -> Bool {
+    let manifest = CaptureManifest(
+      captureID: UUID(),
+      planID: plan.id,
+      planCreatedAt: plan.createdAt,
+      stepID: shot.step.id,
+      capturedAt: Date(),
+      sensorRotation: shot.sensorRotation,
+      displayOrientation: shot.displayOrientation,
+      mirrored: shot.mirrored,
+      region: shot.step.roi,
+      metrics: shot.metrics,
+      holdFramesRequired: shot.step.holdFrames,
+      framesDropped: shot.framesDropped
+    )
+
+    do {
+      let manifestData = try ManifestEncoder.encode(manifest)
+
+      try await queue.enqueue(
+        manifest: manifestData,
+        frame: shot.frameData,
+        captureID: manifest.captureID
       )
 
-      guard let manifestData = try? ManifestEncoder.encode(manifest) else {
-          return
-      }
-
-      try? await queue.enqueue(
-          manifest: manifestData,
-          frame: shot.frameData,
-          captureID: manifest.captureID
-      )
-  }}
+      return true
+    } catch {
+      print("Failed to enqueue capture: \(error)")
+      return false
+    }
+  }
+}
 
 // MARK: - Plan loading
 

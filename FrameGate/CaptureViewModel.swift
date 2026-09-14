@@ -38,12 +38,21 @@ enum CaptureEvent {
   case shutterTapped
 }
 
+enum CaptureEffect {
+  case captureEnqueued
+}
+
 @MainActor
 final class CaptureViewModel: ObservableObject {
 
   @Published private(set) var state: CaptureScreenState
 
+  var effects: AnyPublisher<CaptureEffect, Never> {
+    effectSubject.eraseToAnyPublisher()
+  }
+
   private let container: AppContainer
+  private let effectSubject = PassthroughSubject<CaptureEffect, Never>()
   private var cancellables: Set<AnyCancellable> = []
   private var isRunning = false
 
@@ -75,7 +84,13 @@ private extension CaptureViewModel {
 
   func enqueue(_ shot: CapturedShot) {
     Task {
-      await container.enqueue(shot)
+      let didEnqueue = await container.enqueue(shot)
+
+      guard didEnqueue else {
+        return
+      }
+
+      effectSubject.send(.captureEnqueued)
     }
   }
 

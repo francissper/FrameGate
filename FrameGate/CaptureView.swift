@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct CaptureView: View {
   @StateObject private var viewModel: CaptureViewModel
@@ -35,6 +36,17 @@ struct CaptureView: View {
     }
     .onDisappear {
       viewModel.send(.disappeared)
+    }
+    .onReceive(viewModel.effects) { effect in
+      handle(effect)
+    }
+  }
+
+  private func handle(_ effect: CaptureEffect) {
+    switch effect {
+    case .captureEnqueued:
+      let generator = UINotificationFeedbackGenerator()
+      generator.notificationOccurred(.success)
     }
   }
 }
