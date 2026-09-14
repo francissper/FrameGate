@@ -5,6 +5,7 @@
 //  Created by Franciss Peralta on 13/09/26.
 //
 
+import Foundation
 import Combine
 import FrameGateCore
 
