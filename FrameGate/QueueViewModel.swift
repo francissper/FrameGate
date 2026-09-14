@@ -41,7 +41,7 @@ final class QueueViewModel: ObservableObject {
 private extension QueueViewModel {
 
     static func row(from record: CaptureRecord) -> QueueRowState {
-        let name = (record.framePath as NSString).lastPathComponent
+        let name = record.frameFilename
         let detail: String
         switch record.status {
         case .pending:
