@@ -72,9 +72,11 @@ extension UploadQueueTests {
         try await queue.enqueue(manifest: manifest, frame: frame, captureID: captureID)
 
         let record = await queue.currentRecords[0]
-        XCTAssertTrue(FileManager.default.fileExists(atPath: record.framePath),
+        let framePath = directory.appendingPathComponent(record.frameFilename).path
+        let manifestPath = directory.appendingPathComponent(record.manifestFilename).path
+        XCTAssertTrue(FileManager.default.fileExists(atPath: framePath),
                       "a record pointing at a file that is not there is worse than no record")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: record.manifestPath))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: manifestPath))
     }
 }
 

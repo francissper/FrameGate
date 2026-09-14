@@ -106,7 +106,7 @@ extension CapturePipelineTests {
         let step = pipeline.fire()
         pipeline.stop()
 
-        XCTAssertEqual(step?.id, "only-step")
+      XCTAssertEqual(step?.step.id, "only-step")
     }
 
     func testFiringWhileNotArmedReturnsNil() throws {
