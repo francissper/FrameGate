@@ -12,12 +12,37 @@ continues.
 
 ### The app
 
+Select the `FrameGate` scheme and run on any iPhone Simulator. There is no
+camera dependency: `ReplayFrameSource` plays back generated patterns, so the
+app runs end to end with no physical device.
+
+On launch the bundled `plan.json` loads through the same tolerant parser the
+Core tests cover; any diagnostic is printed to the console rather than shown
+in the UI, as the brief asks. Firing the shutter while `armed` encodes the
+frame to JPEG, builds its manifest, and enqueues both — watch the counter next
+to "Queue" in the header rise, then open Queue to see the record move from
+`pending` through its retry schedule to `uploaded`.
+
 ### The tests
 
 Select the `FrameGateCoreTests` scheme and run ⌘U. All logic lives in the
 `FrameGateCore` package, so the tests run without launching the app.
 
 ### The mock server
+
+```bash
+cd mock-server
+docker build -t framegate-mock .
+docker run -p 8080:8080 framegate-mock
+```
+
+The app points at `http://localhost:8080/v1/captures` via
+`URLSessionUploadTransport`. On the Simulator, `localhost` resolves to the host
+Mac, so no extra networking setup is needed. The first idempotency key
+exercises the brief's suggested script — 503, 503, timeout, 500, 201 — and
+settles as `uploaded`; every key after that succeeds on the first attempt.
+Retry and backoff timing are graded against `FakeTransport` in the test suite,
+not against this server.
 
 ## Plan format
 
@@ -360,6 +385,43 @@ the battery in silence.
 
 ## What I traded away
 
+`FrameGateCore` is a real Swift package and carries the parser, frame source,
+metrics, reducer and queue. The app target keeps only the SwiftUI screens and
+composition root, wired by hand rather than through a DI framework. That leaves
+module boundaries around the code that is worth testing while keeping the demo
+app easy to open and run.
+
+Sharpness is measured as mean neighbour difference rather than Laplacian
+variance or Tenengrad: the cheapest operator that separates the test patterns,
+since this runs thirty times a second.
+
+A fixed sharpness baseline is calibrated on the reference checkerboard rather
+than normalizing against the ROI's own local contrast, which would cost a second
+pass over the pixels per frame.
+
+Five backoff attempts cover about a minute rather than a longer retry budget:
+background upload is out of scope, so retrying past what the foreground session
+can cover would not help.
+
 ## What I knowingly cut
 
+Real `AVCaptureSession` — explicitly an unscored stretch goal, and unverifiable
+on Simulator regardless.
+
+Device rotation handling in the demo: `CaptureViewModel` reports a fixed
+`.portrait` orientation. The `ROIMapper` itself is fully tested across all four
+`DisplayOrientation` cases; only the live wiring from `UIDevice` to that
+parameter is not connected in this build.
+
+A burst/multi-frame step kind: `StepKind` reserves the space, but only `single`
+is implemented.
+
+Thumbnails, sections, and swipe actions in Queue — explicitly out of scope.
+
 ## What is unverified
+
+Compatibility with Xcode 16 specifically: developed on Xcode 26.6, since Xcode
+16 cannot be installed on macOS 26 on this machine.
+
+Behaviour on a physical device: everything was built and verified against the
+Simulator and `ReplayFrameSource`, per the brief's constraints.
