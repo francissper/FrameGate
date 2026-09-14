@@ -5,6 +5,8 @@
 //  Created by Franciss Peralta on 13/09/26.
 //
 
+// swiftlint:disable file_length
+
 import XCTest
 @testable import FrameGateCore
 
@@ -541,35 +543,16 @@ extension UploadQueueTests {
         )
         let captureID = UUID()
 
-        // Session one: the capture is persisted, the request is attempted,
-        // no response arrives, and then the process disappears.
-        do {
-            let queue = try await makeQueue(transport)
-
-            try await queue.enqueue(
-                manifest: manifest,
-                frame: frame,
-                captureID: captureID
-            )
-
-            await queue.drainOnce()
-        }
+        try await persistAndTimeoutFirstSession(
+            transport: transport,
+            captureID: captureID
+        )
 
         // Session two: a new queue reconstructs state only from disk.
         let relaunched = try await makeQueue(transport)
         let afterRelaunch = await relaunched.currentRecords[0]
 
-        XCTAssertEqual(
-            afterRelaunch.status,
-            .pending,
-            "nothing should remain stuck in an in-flight state"
-        )
-
-        XCTAssertEqual(
-            afterRelaunch.attempts,
-            1,
-            "the timed-out attempt must still count"
-        )
+        assertPendingAfterRelaunch(afterRelaunch)
 
         clock.advance(by: 2)
 
@@ -579,11 +562,46 @@ extension UploadQueueTests {
         // request before the timeout, it recognises the duplicate.
         let settled = await relaunched.currentRecords
 
-        XCTAssertEqual(
-            settled[0].status,
-            .uploaded
+        XCTAssertEqual(settled[0].status, .uploaded)
+        assertSentExactlyOnceAfterDuplicateRetry(
+            transport: transport,
+            captureID: captureID
+        )
+    }
+
+    private func persistAndTimeoutFirstSession(
+        transport: FakeTransport,
+        captureID: UUID
+    ) async throws {
+        let queue = try await makeQueue(transport)
+
+        try await queue.enqueue(
+            manifest: manifest,
+            frame: frame,
+            captureID: captureID
         )
 
+        await queue.drainOnce()
+    }
+
+    private func assertPendingAfterRelaunch(_ record: CaptureRecord) {
+        XCTAssertEqual(
+            record.status,
+            .pending,
+            "nothing should remain stuck in an in-flight state"
+        )
+
+        XCTAssertEqual(
+            record.attempts,
+            1,
+            "the timed-out attempt must still count"
+        )
+    }
+
+    private func assertSentExactlyOnceAfterDuplicateRetry(
+        transport: FakeTransport,
+        captureID: UUID
+    ) {
         let keys = transport.requests.map(\.idempotencyKey)
 
         XCTAssertEqual(

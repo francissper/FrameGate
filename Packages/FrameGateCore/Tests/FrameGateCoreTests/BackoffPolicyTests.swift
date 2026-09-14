@@ -85,7 +85,6 @@ extension BackoffPolicyTests {
     )
   }
 
-
   func testJitterSpreadsRetriesAcrossAWindow() {
     let backoff = BackoffPolicy(base: 2, cap: 60, maxAttempts: 5)
     var seen: Set<TimeInterval> = []
