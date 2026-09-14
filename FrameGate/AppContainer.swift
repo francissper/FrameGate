@@ -20,6 +20,7 @@ final class AppContainer: ObservableObject {
     let queue: UploadQueue
 
     private let storageDirectory: URL
+    private var drainTimer: Timer?
 
     init() {
         let loaded = Self.loadPlan()
@@ -35,9 +36,12 @@ final class AppContainer: ObservableObject {
                                                      in: .userDomainMask)[0]
         let journalURL = storageDirectory.appendingPathComponent("queue.log")
 
-        // A real transport would wrap URLSession and point at the mock server.
-        // Until that lands, the fake keeps the app runnable end to end.
-        let transport = FakeTransport(script: [], thereafter: .stored(duplicate: false))
+        // Points at the mock server, started with the documented docker command.
+        // Retry and backoff are still graded against the fake transport in tests.
+        guard let transportURL = URL(string: "http://localhost:8080/v1/captures") else {
+            preconditionFailure("Invalid upload endpoint")
+        }
+        let transport = URLSessionUploadTransport(endpoint: transportURL)
 
         do {
             let journal = try Journal(url: journalURL)
@@ -49,6 +53,18 @@ final class AppContainer: ObservableObject {
 
     func restoreQueue() async {
         try? await queue.restore()
+    }
+
+    func startDraining() {
+        drainTimer?.invalidate()
+        drainTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { await self?.queue.drainOnce() }
+        }
+    }
+
+    func stopDraining() {
+        drainTimer?.invalidate()
+        drainTimer = nil
     }
 
     /// Encodes the shot, builds its manifest, and enqueues both. Called from
