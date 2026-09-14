@@ -7,6 +7,7 @@
 
 import Combine
 import CoreGraphics
+import CoreVideo
 import Foundation
 
 /// What one frame produced, ready for the HUD to render.
@@ -17,6 +18,22 @@ public struct CaptureTick: Equatable, Sendable {
     public let outline: CGRect
     /// Rolling average, so the number does not jump every frame.
     public let millisecondsPerFrame: Double
+    public let framesDropped: Int
+}
+
+/// Everything needed to enqueue an accepted shot, without the app re-deriving
+/// geometry or metrics it already has.
+/// `@unchecked Sendable`: `CVPixelBuffer` is not Sendable by the compiler's
+/// count, but this one is never mutated after `fire()` returns it — it is
+/// handed straight to the JPEG encoder and then dropped. There is no shared
+/// mutable state here for the compiler to worry about.
+public struct CapturedShot: @unchecked Sendable {
+    public let step: Step
+    public let buffer: CVPixelBuffer
+    public let sensorRotation: SensorRotation
+    public let mirrored: Bool
+    public let displayOrientation: DisplayOrientation
+    public let metrics: FrameMetrics
     public let framesDropped: Int
 }
 
@@ -38,6 +55,9 @@ public final class CapturePipeline: @unchecked Sendable {
     private var frameCount = 0
     private var droppedCount = 0
     private var averageMilliseconds: Double = 0
+
+    private var latestFrame: Frame?
+    private var latestMetrics: FrameMetrics?
 
     /// Geometry the view reports as it changes. The pipeline cannot know these.
     private var viewSize: CGSize = .zero
@@ -80,14 +100,28 @@ public final class CapturePipeline: @unchecked Sendable {
         self.fillMode = fillMode
     }
 
-    /// The shutter. Only meaningful while armed.
-    public func fire() -> Step? {
-        guard gate.phase == .armed, gate.stepIndex < plan.steps.count else { return nil }
+    /// The shutter. Only meaningful while armed. Returns what was on screen at the
+    /// moment of the tap — a single held reference, overwritten every frame just
+    /// like the frame source's own keep-latest slot, not a growing pool.
+    public func fire() -> CapturedShot? {
+        guard gate.phase == .armed,
+              gate.stepIndex < plan.steps.count,
+              let frame = latestFrame,
+              let metrics = latestMetrics
+        else { return nil }
+
         let step = plan.steps[gate.stepIndex]
         gate = Gate.fire(gate, tick: frameCount)
         // The analyzer's previous downsample belongs to this step's region.
         analyzer.reset()
-        return step
+
+        return CapturedShot(step: step,
+                            buffer: frame.buffer,
+                            sensorRotation: frame.sensorRotation,
+                            mirrored: frame.mirrored,
+                            displayOrientation: displayOrientation,
+                            metrics: metrics,
+                            framesDropped: droppedCount)
     }
 }
 
@@ -125,6 +159,9 @@ private extension CapturePipeline {
         averageMilliseconds = averageMilliseconds == 0
             ? elapsed
             : averageMilliseconds * 0.9 + elapsed * 0.1
+
+        latestFrame = frame
+        latestMetrics = metrics
 
         tickSubject.send(CaptureTick(gate: gate,
                                      metrics: metrics,
