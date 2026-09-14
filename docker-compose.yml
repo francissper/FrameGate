@@ -1,0 +1,7 @@
+services:
+  mock-server:
+    build:
+      context: ./mock-server
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
