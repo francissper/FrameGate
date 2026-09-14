@@ -26,3 +26,7 @@ identifier_name:
 function_parameter_count:
   warning: 8
   error: 10
+
+cyclomatic_complexity:
+  warning: 12
+  error: 15

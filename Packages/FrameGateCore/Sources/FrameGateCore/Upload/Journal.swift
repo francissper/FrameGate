@@ -79,8 +79,8 @@ private extension Journal {
         case .captured(let id, let manifest, let frame, let at):
             dict = ["event": "captured",
                     "captureId": id.uuidString,
-                    "manifestPath": manifest,
-                    "framePath": frame,
+                    "manifestFilename": manifest,
+                    "frameFilename": frame,
                     "at": at.timeIntervalSince1970]
         case .attempted(let id, let attempt, let at):
             dict = ["event": "attempted",
@@ -112,6 +112,11 @@ private extension Journal {
         return json
     }
 
+    func filename(from value: Any?) -> String? {
+        guard let raw = value as? String else { return nil }
+        return URL(fileURLWithPath: raw).lastPathComponent
+    }
+
     func deserialize(_ json: [String: Any]) -> JournalEvent? {
         guard
             let eventType = json["event"] as? String,
@@ -124,10 +129,10 @@ private extension Journal {
 
         switch eventType {
         case "captured":
-            guard let manifest = json["manifestPath"] as? String,
-                  let frame = json["framePath"] as? String
+            guard let manifest = filename(from: json["manifestFilename"] ?? json["manifestPath"]),
+                  let frame = filename(from: json["frameFilename"] ?? json["framePath"])
             else { return nil }
-            return .captured(captureID: id, manifestPath: manifest, framePath: frame, at: at)
+            return .captured(captureID: id, manifestFilename: manifest, frameFilename: frame, at: at)
         case "attempted":
             guard let attempt = json["attempt"] as? Int else { return nil }
             return .attempted(captureID: id, attempt: attempt, at: at)
@@ -158,8 +163,8 @@ private extension Journal {
         switch event {
         case .captured(let id, let manifest, let frame, _):
             records[id] = CaptureRecord(captureID: id,
-                                        manifestPath: manifest,
-                                        framePath: frame)
+                                        manifestFilename: manifest,
+                                        frameFilename: frame)
             order.append(id)
         case .attempted(let id, let attempt, _):
             records[id]?.attempts = attempt

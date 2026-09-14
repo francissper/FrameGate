@@ -11,7 +11,7 @@ import Foundation
 /// replaying these in order, which is what makes a half-written line survivable:
 /// the torn line is discarded and everything before it still stands.
 public enum JournalEvent: Equatable, Sendable {
-    case captured(captureID: UUID, manifestPath: String, framePath: String, at: Date)
+    case captured(captureID: UUID, manifestFilename: String, frameFilename: String, at: Date)
     case attempted(captureID: UUID, attempt: Int, at: Date)
     case retryScheduled(captureID: UUID, nextAttemptAt: Date, at: Date)
     case uploaded(captureID: UUID, at: Date)

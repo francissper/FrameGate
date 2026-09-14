@@ -8,9 +8,11 @@
 
 /* Begin PBXBuildFile section */
 		D828B9C630550A4400EBF472 /* FrameGateCore in Frameworks */ = {isa = PBXBuildFile; productRef = D828B9C530550A4400EBF472 /* FrameGateCore */; };
+		D828B9F13057BC1F00EBF472 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = D828B9F03057BC1F00EBF472 /* README.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		D828B9F03057BC1F00EBF472 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		D8E961D93054E81F001EB70B /* FrameGate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FrameGate.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D8E961E730550135001EB70B /* FrameGateCore */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = FrameGateCore; path = Packages/FrameGateCore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -45,6 +47,7 @@
 		D8E961D03054E81F001EB70B = {
 			isa = PBXGroup;
 			children = (
+				D828B9F03057BC1F00EBF472 /* README.md */,
 				D8E961E730550135001EB70B /* FrameGateCore */,
 				D8E961DB3054E81F001EB70B /* FrameGate */,
 				D828B9C430550A4400EBF472 /* Frameworks */,
@@ -126,6 +129,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D828B9F13057BC1F00EBF472 /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

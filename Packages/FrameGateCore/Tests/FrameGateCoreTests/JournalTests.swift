@@ -35,8 +35,8 @@ final class JournalTests: XCTestCase {
 
   private func captured(_ id: UUID, at seconds: TimeInterval = 0) -> JournalEvent {
     .captured(captureID: id,
-              manifestPath: "\(id.uuidString).json",
-              framePath: "\(id.uuidString).jpg",
+              manifestFilename: "\(id.uuidString).json",
+              frameFilename: "\(id.uuidString).jpg",
               at: Date(timeIntervalSince1970: seconds))
   }
 }

@@ -21,22 +21,25 @@ public struct CaptureRecord: Equatable, Sendable {
     /// A timeout leaves the outcome unknown, so the retry must carry the same
     /// key for the server to recognise it.
     public let captureID: UUID
-    public let manifestPath: String
-    public let framePath: String
+    /// Just the filenames. The full paths are resolved against the queue's
+    /// storage directory at read time, so relaunches never depend on a stale
+    /// absolute app-container path.
+    public let manifestFilename: String
+    public let frameFilename: String
     public var status: UploadStatus
     public var attempts: Int
     /// When the drain may try again. Nil while uploaded or failed.
     public var nextAttemptAt: Date?
 
     public init(captureID: UUID,
-                manifestPath: String,
-                framePath: String,
+                manifestFilename: String,
+                frameFilename: String,
                 status: UploadStatus = .pending,
                 attempts: Int = 0,
                 nextAttemptAt: Date? = nil) {
         self.captureID = captureID
-        self.manifestPath = manifestPath
-        self.framePath = framePath
+        self.manifestFilename = manifestFilename
+        self.frameFilename = frameFilename
         self.status = status
         self.attempts = attempts
         self.nextAttemptAt = nextAttemptAt
