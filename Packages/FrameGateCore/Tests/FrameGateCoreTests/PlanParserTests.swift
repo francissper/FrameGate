@@ -154,6 +154,34 @@ final class PlanParserTests: XCTestCase {
         XCTAssertEqual(overview.thresholds.sharpness.exit, Decimal(string: "0.40"))
     }
 
+    func testMissingMetricThresholdUsesDefaultWithoutDroppingStep() throws {
+        let (plan, diagnostics) = try parseMalformed()
+
+        let overview = try XCTUnwrap(
+            plan.steps.first {
+                $0.id == "overview"
+            }
+        )
+
+        XCTAssertEqual(
+            overview.thresholds.motion.enter,
+            Decimal(2) / Decimal(100)
+        )
+
+        XCTAssertEqual(
+            overview.thresholds.motion.exit,
+            Decimal(4) / Decimal(100)
+        )
+
+        XCTAssertTrue(
+            diagnostics.contains {
+                $0.stepID == "overview"
+                    && $0.severity == .info
+                    && $0.message.contains("motion threshold missing")
+            }
+        )
+    }
+
     // the decimal never passes through a Double
     func testThresholdsKeepDecimalPrecision() throws {
         let (plan, _) = try parseMalformed()
